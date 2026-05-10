@@ -62,7 +62,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     solve_time = st.number_input("평균 문제 풀이 시간 (초)", min_value=0, value=120, help="한 문제를 푸는 데 걸리는 평균 시간")
-    hint_count = st.slider("힌트 사용 횟수", 0, 15, 2)
+    hint_count = st.slider("답지 확인 횟수", 0, 15, 2)
 
 with col2:
     accuracy = st.slider("최근 정답률 (%)", 0, 100, 75)
