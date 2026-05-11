@@ -56,59 +56,113 @@ st.title("📊 수학 학습 유형 AI 진단 시스템")
 st.markdown("학생의 **문제 해결 과정 데이터**를 분석하여 최적의 학습 유형을 분류합니다.")
 st.divider()
 
-# 사용자 입력창 배치
-st.subheader("📝 학생 데이터 입력")
-col1, col2 = st.columns(2)
+if 'start_times' not in st.session_state:
+    st.session_state.start_times = [None, None, None] # 각 문제 시작 시간
+if 'solved' not in st.session_state:
+    st.session_state.solved = [False, False, False]   # 각 문제 해결 여부
+if 'solve_times' not in st.session_state:
+    st.session_state.solve_times = [0, 0, 0]          # 각 문제 소요 시간
 
-with col1:
-    solve_time = st.number_input("평균 문제 풀이 시간 (초)", min_value=0, value=120, help="한 문제를 푸는 데 걸리는 평균 시간")
-    hint_count = st.slider("답지 확인 횟수", 0, 15, 2)
+# --- [문제 데이터 설정] ---
+problems = [
+    {"img": "math_problem.png", "ans": "3", "hint": "이 문제에서는 먼저 각 좌표의 값을 구하는 것이 가장 중요합니다!! 좌표를 각자 구한 뒤 같은 크기를 가지는 도형을 찾아주세요!!"},
+    {"img": "math_problem1.png", "ans": "20", "hint": "이 문제에서는 양변에 밑이 같은 로그를 취하여 풀어나가야 합니다!! 최댓값을 그대로 쓰지 않고, 이는 로그를 취한 수라는 것을 잊지 않는 것이 중요합니다!!!"},
+    {"img": "math_problem2.png", "ans": "12", "hint": "이 문제에서는 접힌 활꼴의 호의 중심각의 크기를 파악하는 것이 중요합니다!! 호의 길이 공식을 이용해서 구해주세요!"}
+]
 
-with col2:
-    accuracy = st.slider("최근 정답률 (%)", 0, 100, 75)
-    retry_count = st.number_input("평균 재시도 횟수", min_value=0, value=1)
+st.title("✍️ 수학 실전 테스트 (3문제)")
+st.write("모든 문제를 풀어야 AI 정밀 진단 결과를 볼 수 있습니다.")
 
-# --- [3] 분석 실행 및 결과 출력 ---
-if st.button("AI 분석 시작", use_container_width=True):
-    with st.spinner('사용자의 학습 패턴을 알고리즘으로 분석 중입니다...'):
-        # 입력 데이터 변환 (시간, 힌트, 정답률(0~1), 재시도)
-        user_data = np.array([[solve_time, hint_count, accuracy/100, retry_count]])
-        
-        # AI 예측
-        prediction = model.predict(user_data)[0]
-        result_name = types[prediction]
-        time.sleep(1.5) # 연출용 대기 시간
-
-    # 결과 대시보드
-    st.success("✅ 분석이 완료되었습니다!")
+# --- [문제 반복 생성] ---
+for i in range(3):
     st.divider()
+    st.subheader(f"📝 문제 {i+1}번")
+    st.image(problems[i]['img'], use_container_width=True)
     
-    # 결과 요약
-    st.subheader(f"당신의 학습 유형은 :blue[[{result_name}]] 입니다.")
-    
-    # 시각화 데이터 설정 (유형에 따른 능력치 차별화)
-    if prediction == 0:
-        scores = [95, 90, 85]
-    elif prediction == 1:
-        scores = [50, 70, 45]
+    # 1. 시작 버튼
+    if not st.session_state.solved[i]:
+        if st.button(f"⏱️ {i+1}번 문제 풀이 시작", key=f"start_{i}"):
+            st.session_state.start_times[i] = time.time()
+            st.info(f"{i+1}번 문제 측정을 시작합니다.")
+
+        # 2. 힌트
+        with st.expander(f"🔍 {i+1}번 힌트 보기"):
+            st.write(problems[i]['hint'])
+
+        # 3. 정답 입력
+        user_ans = st.text_input(f"{i+1}번 정답 입력", key=f"input_{i}")
+
+        if st.button(f"✅ {i+1}번 정답 확인", key=f"check_{i}"):
+            if st.session_state.start_times[i] is None:
+                st.warning("먼저 '풀이 시작' 버튼을 눌러주세요.")
+            elif user_ans == problems[i]['ans']:
+                elapsed = int(time.time() - st.session_state.start_times[i])
+                st.session_state.solve_times[i] = elapsed
+                st.session_state.solved[i] = True
+                st.success(f"정답입니다! 소요 시간: {elapsed}초")
+                st.balloons()
+            else:
+                st.error("오답입니다. 다시 시도해보세요!")
     else:
-        scores = [20, 30, 25]
+        st.success(f"✅ 완료! (소요 시간: {st.session_state.solve_times[i]}초)")
 
-    chart_data = pd.DataFrame({
-        '역량 항목': ['개념 이해도', '연산 정확도', '문제 해석력'],
-        '점수': scores
-    })
+# --- [최종 AI 진단 연결] ---
+st.divider()
 
-    # 막대 차트 출력
-    st.bar_chart(data=chart_data, x='역량 항목', y='점수')
+# 1. 진단 모드 상태 관리 변수 초기화
+if 'diagnosis_mode' not in st.session_state:
+    st.session_state.diagnosis_mode = False
 
-    # 하단 피드백 박스
-    with st.expander("📌 유형별 맞춤 학습 전략 보기"):
-        if prediction == 0:
-            st.write("이미 훌륭한 학습 습관을 갖추고 있습니다. 고난도 응용 문제와 심화 탐구 프로젝트에 집중해 보세요.")
-        elif prediction == 1:
-            st.write("개념의 정의를 다시 확인하는 과정이 필요합니다. 오답 노트를 활용해 반복되는 실수 패턴을 잡아보세요.")
-        else:
-            st.write("학습에 대한 부담을 줄이는 것이 급선무입니다. 아주 쉬운 단계부터 성공 경험을 쌓는 '스몰 스텝' 전략을 추천합니다.")
+if all(st.session_state.solved):
+    total_time = sum(st.session_state.solve_times)
+    avg_time = total_time / 3
+    
+    st.subheader("🎉 모든 문제를 풀었습니다!")
+    st.write(f"총 소요 시간: {total_time}초 (평균 {avg_time:.1f}초)")
+    
+    # 버튼을 누르면 진단 모드를 True로 바꿈
+    if st.button("🚀 AI 정밀 진단 결과 보기"):
+        st.session_state.diagnosis_mode = True
 
-st.sidebar.info("본 시스템은 XGBoost 알고리즘을 활용한 학생 맞춤형 교육 솔루션 프로토타입입니다.")
+    # 진단 모드가 True일 때만 아래 내용 표시
+    if st.session_state.diagnosis_mode:
+        st.subheader("📝 학생 데이터 입력")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # 수동 입력 대신 자동으로 측정된 평균 시간을 기본값(value)으로 넣어주면 더 좋습니다!
+            solve_time = st.number_input("평균 문제 풀이 시간 (초)", min_value=0, value=int(avg_time))
+            hint_count = st.slider("힌트 확인 횟수", 0, 15, 2)
+
+        with col2:
+            accuracy = st.slider("최근 정답률 (%)", 0, 100, 75)
+            retry_count = st.number_input("평균 재시도 횟수", min_value=0, value=1)
+
+        # 분석 버튼 (이제 독립적으로 작동합니다)
+        if st.button("AI 분석 시작", use_container_width=True):
+            with st.spinner('사용자의 학습 패턴을 알고리즘으로 분석 중입니다...'):
+                user_data = np.array([[solve_time, hint_count, accuracy/100, retry_count]])
+                prediction = model.predict(user_data)[0]
+                result_name = types[prediction]
+                time.sleep(1.5)
+
+            st.success("✅ 분석이 완료되었습니다!")
+            st.divider()
+            st.subheader(f"당신의 학습 유형은 :blue[[{result_name}]] 입니다.")
+
+            # (이후 그래프 및 피드백 코드는 동일하게 유지)
+            if prediction == 0: scores = [95, 90, 85]
+            elif prediction == 1: scores = [50, 70, 45]
+            else: scores = [20, 30, 25]
+
+            chart_data = pd.DataFrame({'역량 항목': ['개념 이해도', '연산 정확도', '문제 해석력'], '점수': scores})
+            st.bar_chart(data=chart_data, x='역량 항목', y='점수')
+
+            with st.expander("📌 유형별 맞춤 학습 전략 보기"):
+                if prediction == 0: st.write("이미 훌륭한 학습 습관을 갖추고 있습니다! 심화 문제를 바탕으로 실력을 키워보세요!!")
+                elif prediction == 1: st.write("개념의 정의를 다시 확인하는 과정이 필요합니다! 차근차근 하다보면 실력이 상승할 수 있어요!")
+                else: st.write("학습에 대한 부담을 줄이는 것이 급선무입니다. 수학은 생각보다 재밌는 과목일 수도 있어요!!")
+
+        st.sidebar.info("본 시스템은 XGBoost 알고리즘을 활용한 프로토타입입니다.")     
+else:
+    st.warning("모든 문제를 풀어야 AI 진단 버튼이 활성화됩니다.")
